@@ -413,12 +413,7 @@ def stacknas(path,axis=1):
 
 #def removebadts(train_df,covariate_df):
 
-
-
-
-
-
-def simple_features(path,outpath,axis=1):
+def simple_features(modispath,trainingpath,outpath,axis=1):
 
 	'''
 	some fucking info
@@ -433,9 +428,66 @@ def simple_features(path,outpath,axis=1):
 			mask = np.isnan(data)
 			table = np.ma.masked_invalid(data)
 
-			varname = outpath+str(body[0])+"_mean.csv"
+			varname1 = outpath+str(body[0])+"_mean.csv"
 			variable = np.ma.mean(table,axis=axis)
 			np.savetxt(varname,variable, delimiter=",")
+
+def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
+						2010,2011,2012,2013]),date_variable="yeardate",\
+						variables=1,window=1,fillvalues=-3000):
+
+	# column names in searched_data_frame
+	colnames = list(imagesdf.columns.values)
+	
+	# finde index of date variable
+	idx_names = colnames.index(date_variable)
+
+	#for i in xrange(np.shape(years)[0]):
+	for i in xrange(1):
+		base_date = float(years[i])
+		subset = imagesdf.loc\
+		[\
+		  (imagesdf.iloc[:,idx_names] == (base_date - window))\
+		| (imagesdf.iloc[:,idx_names] == (base_date))\
+		| (imagesdf.iloc[:,idx_names] == (base_date + window))\
+		]
+
+		print(type(imagesdf))
+		print(type(subset))
+
+		# initialize
+		dataset,rows,cols,bands = readtif(subset.iloc[0,5])
+		image_time_series = np.ma.zeros((len(subset.index), cols * rows),dtype=np.float64)
+
+		for j in xrange(len(subset.index)):
+			# read images 
+			dataset,rows,cols,bands = readtif(subset.iloc[i,5])
+			
+			# make numpy array and flatten
+			band = dataset.GetRasterBand(1)
+			band = band.ReadAsArray(0, 0, cols, rows).astype(np.float64)
+			band = np.ravel(band)
+			masked = band == fillvalues
+			image_time_series[i, :] = np.ma.array(band,mask=masked)
+		maskz = np.ma.getmask(image_time_series)
+		column_means = np.ma.mean(image_time_series,axis=0,dtype=np.float64)
+
+	for x in xrange(np.shape(image_time_series)[0]):
+		print(np.sum(maskz[x,:]))
+
+	# image metadata
+	projection = dataset.GetProjection()
+	transform = dataset.GetGeoTransform()
+	driver = dataset.GetDriver()
+
+	outData = createtif(driver,rows,cols,1,"2004_2006_mean4.tif")
+	writetif(outData,column_means,projection,transform,order='r')
+
+	# close
+	outData = None
+	dataset = None
+
+	return subset
 
 
 
