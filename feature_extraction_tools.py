@@ -433,17 +433,20 @@ def simple_features(modispath,trainingpath,outpath,axis=1):
 			np.savetxt(varname,variable, delimiter=",")
 
 def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
-						2010,2011,2012,2013]),date_variable="yeardate",\
-						variables=1,window=1,fillvalues=-3000):
+						2010,2011,2012,2013]),yeardate_variable="yeardate",\
+						monthdata_variable="monthdate",variable=5,\
+						quality_variable=7,badqualityvalues=np.array([-1,2,3]),\
+						window=1,fillvalue=-3000):
 
 	# column names in searched_data_frame
 	colnames = list(imagesdf.columns.values)
 	
 	# finde index of date variable
-	idx_names = colnames.index(date_variable)
+	idx_names = colnames.index(yeardate_variable)
 
-	#for i in xrange(np.shape(years)[0]):
-	for i in xrange(1):
+	for i in xrange(np.shape(years)[0]):
+		print(i)
+	#for i in xrange(1):
 		base_date = float(years[i])
 		subset = imagesdf.loc\
 		[\
@@ -452,42 +455,87 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		| (imagesdf.iloc[:,idx_names] == (base_date + window))\
 		]
 
-		print(type(imagesdf))
-		print(type(subset))
-
 		# initialize
 		dataset,rows,cols,bands = readtif(subset.iloc[0,5])
 		image_time_series = np.ma.zeros((len(subset.index), cols * rows),dtype=np.float64)
 
 		for j in xrange(len(subset.index)):
-			# read images 
-			dataset,rows,cols,bands = readtif(subset.iloc[i,5])
+			
+			# read images (variable of interest and associated quality product) 
+			dataset,rows,cols,bands = readtif(subset.iloc[i,variable])
+			qdataset,qrows,qcols,qbands = readtif(subset.iloc[i,quality_variable])
 			
 			# make numpy array and flatten
 			band = dataset.GetRasterBand(1)
 			band = band.ReadAsArray(0, 0, cols, rows).astype(np.float64)
 			band = np.ravel(band)
-			masked = band == fillvalues
+
+			qband = qdataset.GetRasterBand(1)
+			qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+			qband = np.ravel(qband)
+
+			# check which pixels have bad quality
+			qualityaux = np.in1d(qband,badqualityvalues)
+
+			band[qualityaux]=fillvalue
+			masked = band == fillvalue
+
 			image_time_series[i, :] = np.ma.array(band,mask=masked)
-		maskz = np.ma.getmask(image_time_series)
+
+		# means
 		column_means = np.ma.mean(image_time_series,axis=0,dtype=np.float64)
 
-	for x in xrange(np.shape(image_time_series)[0]):
-		print(np.sum(maskz[x,:]))
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
 
-	# image metadata
-	projection = dataset.GetProjection()
-	transform = dataset.GetGeoTransform()
-	driver = dataset.GetDriver()
+		name = "D:/Julian/64_ie_maps/rasters/covariates/"+base_date+"_mean.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_means,projection,transform,order='r')
 
-	outData = createtif(driver,rows,cols,1,"2004_2006_mean4.tif")
-	writetif(outData,column_means,projection,transform,order='r')
+		# close datasets properly
+		outData = None
+		dataset = None
+		qdataset = None
 
-	# close
-	outData = None
-	dataset = None
+		# standard deviations
 
-	return subset
+	return True
+
+def calculate_spectral_angle(x,y,order=1):
+    '''
+    This operation acts upon two dimensional numpy arrays
+    
+    '''
+    spectral_angle_top = np.sum(np.multiply(x,y),axis=order)
+    spectral_angle_bottom = 1/np.multiply(np.linalg.norm(x,axis=order),np.linalg.norm(y,axis=order))
+    spectral_angle = np.arccos(np.multiply(spectral_angle_top,spectral_angle_bottom))
+
+    return(spectral_angle)
+
+def calculate_spectral_correlation(x,y,order=1):
+    '''
+    This operation acts upon two dimensional numpy arrays
+    
+    '''
+    if (order == 1):
+        x_means = np.mean(x,axis=order)
+        y_means = np.mean(y,axis=order)
+        x = x - x_means[:,np.newaxis]
+        y = y - y_means[:,np.newaxis]
+
+    elif (order == 0):
+        x_means = np.mean(x,axis=order)
+        y_means = np.mean(y,axis=order)
+        x = x - x_means[np.newaxis,:]
+        y = y - y_means[np.newaxis,:]
+
+    spectral_correlation_top = np.sum(np.multiply(x,y),axis=order)
+    spectral_correlation_bottom = 1/np.multiply(np.linalg.norm(x,axis=order),np.linalg.norm(y,axis=order))
+    spectral_correlation = np.multiply(spectral_correlation_top,spectral_correlation_bottom)
+    
+    return(spectral_correlation)
 
 
 
