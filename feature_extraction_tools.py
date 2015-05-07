@@ -481,6 +481,9 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 			masked = band == fillvalue
 
 			image_time_series[i, :] = np.ma.array(band,mask=masked)
+			
+			# close qdataset
+			qdataset = None
 
 		# means
 		column_means = np.ma.mean(image_time_series,axis=0,dtype=np.float64)
@@ -490,16 +493,46 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		transform = dataset.GetGeoTransform()
 		driver = dataset.GetDriver()
 
-		name = "D:/Julian/64_ie_maps/rasters/covariates/"+base_date+"_mean.tif"
+		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_mean.tif"
 		outData = createtif(driver,rows,cols,1,name)
 		writetif(outData,column_means,projection,transform,order='r')
 
-		# close datasets properly
+		# close dataset properly
 		outData = None
-		dataset = None
-		qdataset = None
 
 		# standard deviations
+		column_standarddeviations = np.ma.std(image_time_series,axis=0,dtype=np.float64)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_std.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_standarddeviations,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# coefficient of variations
+		column_means = 1/column_means
+		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_cvar.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,coefficients_of_variation,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+	# close dataset 
+	dataset = None
 
 	return True
 
