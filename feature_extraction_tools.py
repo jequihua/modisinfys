@@ -491,8 +491,6 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 		# bad data count
 		image_time_seriesq = np.sum(image_time_seriesq,axis=0)
-		print(image_time_seriesq)
-		
 
 		# image metadata
 		projection = dataset.GetProjection()
@@ -546,6 +544,22 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		driver = dataset.GetDriver()
 
 		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_cvar.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,coefficients_of_variation,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# percentile 25
+		column_means = 1/column_means
+		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_per25.tif"
 		outData = createtif(driver,rows,cols,1,name)
 		writetif(outData,coefficients_of_variation,projection,transform,order='r')
 
