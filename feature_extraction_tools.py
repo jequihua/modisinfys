@@ -435,7 +435,7 @@ def simple_features(modispath,trainingpath,outpath,axis=1):
 def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 						2010,2011,2012,2013]),yeardate_variable="yeardate",\
 						monthdata_variable="monthdate",variable=5,\
-						quality_variable=7,badqualityvalues=np.array([-1,2,3]),\
+						quality_variable=7,badqualityvalues=[-1,2,3,255],\
 						window=1,fillvalue=-3000):
 
 	# column names in searched_data_frame
@@ -447,6 +447,7 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 	for i in xrange(np.shape(years)[0]):
 		print(i)
 	#for i in xrange(1):
+
 		base_date = float(years[i])
 		subset = imagesdf.loc\
 		[\
@@ -458,16 +459,17 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		# initialize
 		dataset,rows,cols,bands = readtif(subset.iloc[0,5])
 		image_time_series = np.ma.zeros((len(subset.index), cols * rows),dtype=np.float64)
+		image_time_seriesq = np.zeros((len(subset.index), cols * rows),dtype=bool)
 
 		for j in xrange(len(subset.index)):
 			
 			# read images (variable of interest and associated quality product) 
-			dataset,rows,cols,bands = readtif(subset.iloc[i,variable])
-			qdataset,qrows,qcols,qbands = readtif(subset.iloc[i,quality_variable])
+			dataset,rows,cols,bands = readtif(subset.iloc[j,variable])
+			qdataset,qrows,qcols,qbands = readtif(subset.iloc[j,quality_variable])
 			
 			# make numpy array and flatten
 			band = dataset.GetRasterBand(1)
-			band = band.ReadAsArray(0, 0, cols, rows).astype(np.float64)
+			band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
 			band = np.ravel(band)
 
 			qband = qdataset.GetRasterBand(1)
@@ -476,14 +478,33 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 			# check which pixels have bad quality
 			qualityaux = np.in1d(qband,badqualityvalues)
+			image_time_seriesq[j, :] = qualityaux
 
 			band[qualityaux]=fillvalue
 			masked = band == fillvalue
 
-			image_time_series[i, :] = np.ma.array(band,mask=masked)
+
+			image_time_series[j, :] = np.ma.array(band,mask=masked)
 			
 			# close qdataset
 			qdataset = None
+
+		# bad data count
+		image_time_seriesq = np.sum(image_time_seriesq,axis=0)
+		print(image_time_seriesq)
+		
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_badpixels.tif"
+		outData = createtif(driver,rows,cols,1,name,data_type=16)
+		writetif(outData,image_time_seriesq,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
 
 		# means
 		column_means = np.ma.mean(image_time_series,axis=0,dtype=np.float64)
