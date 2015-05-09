@@ -63,7 +63,7 @@ def generatejuliandate(data_frame,positions=None,date_variable="date",\
 		juliandates[i]=float(tojulian(data_frame.loc[i,str(date_variable)],\
 			format=format))
 
-def generateyeardate(data_frame,positions=None,date_variable="date",\
+def generatedate(data_frame,positions=None,date_variable="date",\
 	format="AAAA*MM*DD"):
 	
 	'''
@@ -83,19 +83,28 @@ def generateyeardate(data_frame,positions=None,date_variable="date",\
 	n = len(positions)
 	# initialize
 	yeardates = np.ones((n))
+	monthdates = np.ones((n))
 
 	for i in positions:
 			if format == "AAAA*MM*DD":
-				year = data_frame.loc[i,str(date_variable)]
-				year = year[0:4]
+				date_string = data_frame.loc[i,str(date_variable)]
+				year = date_string[0:4]
+				month = date_string[5:7]
 	
 			elif format == "DD*MM*AAAA":
-				year = data_frame.loc[i,str(date_variable)]
-				year = year[6:10]
+				date_string = data_frame.loc[i,str(date_variable)]
+				year = date_string[6:10]
+				month = date_string[3:5]
 			yeardates[i]=float(year)
+			monthdates[i]=float(month)
 
 	data_frame = data_frame.iloc[positions,:]
+	yeardates = yeardates[positions]
+	monthdates = monthdates[positions]
+
 	data_frame['yeardate'] = pd.Series(yeardates, index=data_frame.index)
+	data_frame['monthdate'] = pd.Series(monthdates, index=data_frame.index)
+	
 	return data_frame
 
 def mergedataframes(dataframe1,dataframe2,on="IdConglome",howtomerge="outer",\
@@ -442,7 +451,8 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 	colnames = list(imagesdf.columns.values)
 	
 	# finde index of date variable
-	idx_names = colnames.index(yeardate_variable)
+	idx_year = colnames.index(yeardate_variable)
+	idx_month = colnames.index(monthdate_variable)
 
 	for i in xrange(np.shape(years)[0]):
 		print(i)
@@ -451,9 +461,9 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		base_date = float(years[i])
 		subset = imagesdf.loc\
 		[\
-		  (imagesdf.iloc[:,idx_names] == (base_date - window))\
-		| (imagesdf.iloc[:,idx_names] == (base_date))\
-		| (imagesdf.iloc[:,idx_names] == (base_date + window))\
+		  (imagesdf.iloc[:,idx_year] == (base_date - window))\
+		| (imagesdf.iloc[:,idx_year] == (base_date))\
+		| (imagesdf.iloc[:,idx_year] == (base_date + window))\
 		]
 
 		# initialize
@@ -565,6 +575,50 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 		# close dataset properly
 		outData = None
+
+		# dry season
+		subsetmonth = subset.loc\
+		[\
+		  (imagesdf.iloc[:,idx_month] == 1)\
+		| (imagesdf.iloc[:,idx_month] == 2)\
+		| (imagesdf.iloc[:,idx_month] == 3)\
+		| (imagesdf.iloc[:,idx_month] == 4)\
+		| (imagesdf.iloc[:,idx_month] == 11)\
+		| (imagesdf.iloc[:,idx_month] == 12)\
+		]
+
+		# initialize
+		image_time_series = np.ma.zeros((len(subset.index), cols * rows),dtype=np.float64)
+		image_time_seriesq = np.zeros((len(subset.index), cols * rows),dtype=bool)
+
+		for j in xrange(len(subset.index)):
+			
+			# read images (variable of interest and associated quality product) 
+			dataset,rows,cols,bands = readtif(subset.iloc[j,variable])
+			qdataset,qrows,qcols,qbands = readtif(subset.iloc[j,quality_variable])
+			
+			# make numpy array and flatten
+			band = dataset.GetRasterBand(1)
+			band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+			band = np.ravel(band)
+
+			qband = qdataset.GetRasterBand(1)
+			qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+			qband = np.ravel(qband)
+
+			# check which pixels have bad quality
+			qualityaux = np.in1d(qband,badqualityvalues)
+			image_time_seriesq[j, :] = qualityaux
+
+			band[qualityaux]=fillvalue
+			masked = band == fillvalue
+
+
+			image_time_series[j, :] = np.ma.array(band,mask=masked)
+			
+			# close qdataset
+			qdataset = None
+
 
 	# close dataset 
 	dataset = None
