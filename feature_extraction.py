@@ -14,4 +14,11 @@ all_images = pd.read_csv("D:/Julian/64_ie_maps/julian_tables_2/allimages_year2.c
 #all_images.to_csv("D:/Julian/64_ie_maps/julian_tables_2/allimages_year2.csv", sep=',', encoding='utf-8',index=False)
 
 # subsetz
-#subset = fe.sliding_features(all_images)
+
+variables = [1,3,4,5,6,8]
+fillvalues = [-1000,-3000,-1000,-3000,-1000,-1000]
+counter = 0
+
+for i in variables:
+	subset = fe.sliding_features(all_images,path="D:/Julian/64_ie_maps/rasters/covariates/",variable=i,fillvalue=fillvalues[counter])
+	

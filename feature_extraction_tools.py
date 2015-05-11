@@ -443,12 +443,15 @@ def simple_features(modispath,trainingpath,outpath,axis=1):
 
 def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 						2010,2011,2012,2013]),yeardate_variable="yeardate",\
-						monthdata_variable="monthdate",variable=5,\
+						monthdate_variable="monthdate",variable=5,\
 						quality_variable=7,badqualityvalues=[-1,2,3,255],\
-						window=1,fillvalue=-3000):
+						window=1,fillvalue=-3000,path=None):
 
 	# column names in searched_data_frame
 	colnames = list(imagesdf.columns.values)
+
+	# variable name
+	varname=colnames[variable]
 	
 	# finde index of date variable
 	idx_year = colnames.index(yeardate_variable)
@@ -493,7 +496,6 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 			band[qualityaux]=fillvalue
 			masked = band == fillvalue
 
-
 			image_time_series[j, :] = np.ma.array(band,mask=masked)
 			
 			# close qdataset
@@ -507,7 +509,7 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		transform = dataset.GetGeoTransform()
 		driver = dataset.GetDriver()
 
-		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_badpixels.tif"
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_badpixels.tif"
 		outData = createtif(driver,rows,cols,1,name,data_type=16)
 		writetif(outData,image_time_seriesq,projection,transform,order='r')
 
@@ -522,7 +524,7 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		transform = dataset.GetGeoTransform()
 		driver = dataset.GetDriver()
 
-		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_mean.tif"
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_mean.tif"
 		outData = createtif(driver,rows,cols,1,name)
 		writetif(outData,column_means,projection,transform,order='r')
 
@@ -537,7 +539,7 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		transform = dataset.GetGeoTransform()
 		driver = dataset.GetDriver()
 
-		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_std.tif"
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_std.tif"
 		outData = createtif(driver,rows,cols,1,name)
 		writetif(outData,column_standarddeviations,projection,transform,order='r')
 
@@ -553,49 +555,47 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		transform = dataset.GetGeoTransform()
 		driver = dataset.GetDriver()
 
-		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_cvar.tif"
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_cvar.tif"
 		outData = createtif(driver,rows,cols,1,name)
 		writetif(outData,coefficients_of_variation,projection,transform,order='r')
 
 		# close dataset properly
 		outData = None
 
-		# percentile 25
-		column_means = 1/column_means
-		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+		# medians
+		column_medians = np.ma.median(image_time_series,axis=0)
 
 		# image metadata
 		projection = dataset.GetProjection()
 		transform = dataset.GetGeoTransform()
 		driver = dataset.GetDriver()
 
-		name = "D:/Julian/64_ie_maps/rasters/covariates/"+str(int(base_date))+"_per25.tif"
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_median.tif"
 		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,coefficients_of_variation,projection,transform,order='r')
+		writetif(outData,column_medians,projection,transform,order='r')
 
 		# close dataset properly
 		outData = None
 
 		# dry season
-		subsetmonth = subset.loc\
+		subsubset= subset.loc\
 		[\
 		  (imagesdf.iloc[:,idx_month] == 1)\
 		| (imagesdf.iloc[:,idx_month] == 2)\
 		| (imagesdf.iloc[:,idx_month] == 3)\
 		| (imagesdf.iloc[:,idx_month] == 4)\
-		| (imagesdf.iloc[:,idx_month] == 11)\
 		| (imagesdf.iloc[:,idx_month] == 12)\
 		]
 
 		# initialize
-		image_time_series = np.ma.zeros((len(subset.index), cols * rows),dtype=np.float64)
-		image_time_seriesq = np.zeros((len(subset.index), cols * rows),dtype=bool)
+		pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
+		pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
 
-		for j in xrange(len(subset.index)):
+		for j in xrange(len(subsubset.index)):
 			
 			# read images (variable of interest and associated quality product) 
-			dataset,rows,cols,bands = readtif(subset.iloc[j,variable])
-			qdataset,qrows,qcols,qbands = readtif(subset.iloc[j,quality_variable])
+			dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
+			qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
 			
 			# make numpy array and flatten
 			band = dataset.GetRasterBand(1)
@@ -608,17 +608,317 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 			# check which pixels have bad quality
 			qualityaux = np.in1d(qband,badqualityvalues)
-			image_time_seriesq[j, :] = qualityaux
+			pimage_time_seriesq[j, :] = qualityaux
 
 			band[qualityaux]=fillvalue
 			masked = band == fillvalue
 
 
-			image_time_series[j, :] = np.ma.array(band,mask=masked)
+			pimage_time_series[j, :] = np.ma.array(band,mask=masked)
+			
+			# close qdataset
+			qdataset = None
+				
+		# means
+		column_means = np.ma.mean(pimage_time_series,axis=0,dtype=np.float64)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drymean.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_means,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# standard deviations
+		column_standarddeviations = np.ma.std(pimage_time_series,axis=0,dtype=np.float64)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drystd.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_standarddeviations,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# coefficient of variations
+		column_means = 1/column_means
+		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drycvar.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,coefficients_of_variation,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# medians
+		column_medians = np.ma.median(pimage_time_series,axis=0)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drymedian.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_medians,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# wet season
+		subsubset= subset.loc\
+		[\
+		  (imagesdf.iloc[:,idx_month] == 5)\
+		| (imagesdf.iloc[:,idx_month] == 6)\
+		| (imagesdf.iloc[:,idx_month] == 7)\
+		| (imagesdf.iloc[:,idx_month] == 8)\
+		| (imagesdf.iloc[:,idx_month] == 9)\
+		| (imagesdf.iloc[:,idx_month] == 10)\
+		| (imagesdf.iloc[:,idx_month] == 11)\
+		]
+
+		# initialize
+		pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
+		pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
+
+		for j in xrange(len(subsubset.index)):
+			
+			# read images (variable of interest and associated quality product) 
+			dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
+			qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+			
+			# make numpy array and flatten
+			band = dataset.GetRasterBand(1)
+			band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+			band = np.ravel(band)
+
+			qband = qdataset.GetRasterBand(1)
+			qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+			qband = np.ravel(qband)
+
+			# check which pixels have bad quality
+			qualityaux = np.in1d(qband,badqualityvalues)
+			pimage_time_seriesq[j, :] = qualityaux
+
+			band[qualityaux]=fillvalue
+			masked = band == fillvalue
+
+
+			pimage_time_series[j, :] = np.ma.array(band,mask=masked)
+			
+			# close qdataset
+			qdataset = None
+				
+		# means
+		column_means = np.ma.mean(pimage_time_series,axis=0,dtype=np.float64)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetmean.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_means,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# standard deviations
+		column_standarddeviations = np.ma.std(pimage_time_series,axis=0,dtype=np.float64)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetstd.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_standarddeviations,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# coefficient of variations
+		column_means = 1/column_means
+		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetcvar.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,coefficients_of_variation,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# medians
+		column_medians = np.ma.median(pimage_time_series,axis=0)
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetmedian.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,column_medians,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# monthly features
+		for m in range(1,13):
+			subsubset= subset.loc\
+			[\
+		  	(imagesdf.iloc[:,idx_month] == m)\
+			]
+
+			# initialize
+			pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
+			pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
+
+			for j in xrange(len(subsubset.index)):
+			
+				# read images (variable of interest and associated quality product) 
+				dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
+				qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+			
+				# make numpy array and flatten
+				band = dataset.GetRasterBand(1)
+				band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				band = np.ravel(band)
+
+				qband = qdataset.GetRasterBand(1)
+				qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				qband = np.ravel(qband)
+
+				# check which pixels have bad quality
+				qualityaux = np.in1d(qband,badqualityvalues)
+				pimage_time_seriesq[j, :] = qualityaux
+
+				band[qualityaux]=fillvalue
+				masked = band == fillvalue
+
+				pimage_time_series[j, :] = np.ma.array(band,mask=masked)
 			
 			# close qdataset
 			qdataset = None
 
+			# means
+			#column_means = np.ma.mean(pimage_time_series,axis=0,dtype=np.float64)
+
+			# image metadata
+			#projection = dataset.GetProjection()
+			#transform = dataset.GetGeoTransform()
+			#driver = dataset.GetDriver()
+
+			#name = path+str(int(base_date))+"/"+str(int(base_date))+"month"+str(m)+"_"+varname+"_mean.tif"
+			#outData = createtif(driver,rows,cols,1,name)
+			#writetif(outData,column_means,projection,transform,order='r')
+
+			# close dataset properly
+			#outData = None
+
+			# medians
+			column_medians = np.ma.median(pimage_time_series,axis=0)
+
+			# image metadata
+			projection = dataset.GetProjection()
+			transform = dataset.GetGeoTransform()
+			driver = dataset.GetDriver()
+
+			name = path+str(int(base_date))+"/"+str(int(base_date))+"_month"+str(m)+"_"+varname+"_median.tif"
+			outData = createtif(driver,rows,cols,1,name)
+			writetif(outData,column_medians,projection,transform,order='r')
+
+			# close dataset properly
+			outData = None
+
+		# Percentiles
+		image_time_series = np.ma.filled(image_time_series,fill_value=np.nan)
+
+		# 10%
+		p10 = np.nanpercentile(image_time_series,10,axis=0)
+		p10[isnan(p10)]=0
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc10.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,p10,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# 30%
+		p30 = np.nanpercentile(image_time_series,30,axis=0)
+		p30[isnan(p30)]=0
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc30.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,p30,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# 70%
+		p70 = np.nanpercentile(image_time_series,70,axis=0)
+		p70[isnan(p70)]=0
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc70.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,p70,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
+
+		# 90%
+		p90 = np.nanpercentile(image_time_series,90,axis=0)
+		p90[isnan(p90)]=0
+
+		# image metadata
+		projection = dataset.GetProjection()
+		transform = dataset.GetGeoTransform()
+		driver = dataset.GetDriver()
+
+		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc90.tif"
+		outData = createtif(driver,rows,cols,1,name)
+		writetif(outData,p90,projection,transform,order='r')
+
+		# close dataset properly
+		outData = None
 
 	# close dataset 
 	dataset = None
