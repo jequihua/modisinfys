@@ -214,12 +214,49 @@ def searchdates(data_frame1,data_frame2,date_variable1="yeardate",date_variable2
 		
 		return data_frames, data_length
 
-
-def extract(xcoord,ycoord,image,qualityimage=None,fillvalue=-3000,\
-					badqualityvalues=np.array([-1,2,3]),data_type=32):
+def extract(xcoord,ycoord,image,nodatavalue=None,data_type=32):
 
 	'''
 	extract raster-value at a given location	
+
+	'''
+	if data_type == 32:
+		data_type = gdal.GDT_Float32
+		format ="f"
+	else:
+		data_type = gdal.GDT_Int16
+		format ="h"
+
+
+	# read image
+	dataset,rows,cols,bands = readtif(image)
+
+	# image metadata
+	projection = dataset.GetProjection()
+	geotransform = dataset.GetGeoTransform()
+	driver = dataset.GetDriver()
+
+	xcoord = int((xcoord - geotransform[0]) / geotransform[1])
+	ycoord = int((ycoord - geotransform[3]) / geotransform[5])
+
+	# pixel value
+	band=dataset.GetRasterBand(1)
+	binaryvalue=band.ReadRaster(xcoord,ycoord,1,1,buf_type=data_type)
+	value = st.unpack(format, binaryvalue)
+	value = value[0]
+
+	if value == nodatavalue:
+		value = np.nan
+
+	return value
+
+
+def qextract(xcoord,ycoord,image,qualityimage=None,fillvalue=-3000,\
+					badqualityvalues=np.array([-1,2,3]),data_type=32):
+
+	'''
+	extract raster-value at a given location taking into account modis
+	quality flags	
 
 	'''
 	if data_type == 32:
@@ -263,7 +300,58 @@ def extract(xcoord,ycoord,image,qualityimage=None,fillvalue=-3000,\
 
 	return value
 
-def imagestacktable(shapefile,data_frame1,data_frame2,\
+def simpleimagestacktable(shapefile,data_frame1,date_variable1="yeardate",\
+					positions1=None,positions2=None,days=None,years=1,\
+					variable=2,quality_variable=7,fillvalue=None):
+	'''
+	some fucking info
+
+	'''
+
+		
+	print("creating coordinates")
+	# coordinates of each object in shapefile
+	shpcoordinates = shapecoordinates(shapefile)
+
+	print("merging dataframes")
+	# merge coordinates to training dataframe
+	merged = mergedataframes(shpcoordinates,data_frame1)
+
+	print("searching dataframes (dates)")
+	data_frames, data_length = searchdates(merged,data_frame2,\
+		date_variable1=date_variable1,date_variable2=date_variable2,\
+		positions1=positions1,positions2=positions2,\
+		days=days)
+
+	# output table dimensions
+	minimum_length = min(data_length)
+	ndata_frames = len(data_frames)
+	output = np.zeros((ndata_frames,minimum_length+1))
+
+	print("processing dataframes")
+	for i in xrange(ndata_frames):
+
+
+		data_frame = data_frames[i]
+
+		output[i,0] = merged.iloc[i,0]
+
+		for j in xrange(minimum_length):
+
+
+			imagepath=data_frame.iloc[j,variable]
+			qualityimagepath=data_frame.iloc[j,quality_variable]
+
+			value = extract(merged.iloc[i,1],merged.iloc[i,2],\
+			image=imagepath,\
+			qualityimage=qualityimagepath,\
+			data_type=16,fillvalue=fillvalue)
+			output[i,j+1]=value 
+
+	return output
+
+
+def compleximagestacktable(shapefile,data_frame1,data_frame2,\
 					date_variable1="yeardate",date_variable2="yeardate",\
 					positions1=None,positions2=None,days=None,years=1,\
 					variable=2,quality_variable=7,fillvalue=None):
@@ -472,29 +560,32 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		# initialize
 		dataset,rows,cols,bands = readtif(subset.iloc[0,5])
 		image_time_series = np.ma.zeros((len(subset.index), cols * rows),dtype=np.float64)
-		image_time_seriesq = np.zeros((len(subset.index), cols * rows),dtype=bool)
+		if quality_variable is not None:
+			image_time_seriesq = np.zeros((len(subset.index), cols * rows),dtype=bool)
 
 		for j in xrange(len(subset.index)):
 			
 			# read images (variable of interest and associated quality product) 
 			dataset,rows,cols,bands = readtif(subset.iloc[j,variable])
-			qdataset,qrows,qcols,qbands = readtif(subset.iloc[j,quality_variable])
 			
 			# make numpy array and flatten
 			band = dataset.GetRasterBand(1)
 			band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
 			band = np.ravel(band)
 
-			qband = qdataset.GetRasterBand(1)
-			qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
-			qband = np.ravel(qband)
+			if quality_variable is not None:
+				qdataset,qrows,qcols,qbands = readtif(subset.iloc[j,quality_variable])	
+				qband = qdataset.GetRasterBand(1)
+				qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				qband = np.ravel(qband)
 
-			# check which pixels have bad quality
-			#qualityaux = np.in1d(qband,badqualityvalues)
-			qualityaux = qband > 21 
-			image_time_seriesq[j, :] = qualityaux
+				# check which pixels have bad quality
+				qualityaux = np.in1d(qband,badqualityvalues)
+				#qualityaux = qband > 21 
+				image_time_seriesq[j, :] = qualityaux
 
-			band[qualityaux]=fillvalue
+				band[qualityaux]=fillvalue
+			
 			masked = band == fillvalue
 
 			image_time_series[j, :] = np.ma.array(band,mask=masked)
@@ -590,28 +681,32 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 		# initialize
 		pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
-		pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
+		if quality_variable is not None:
+			pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
 
 		for j in xrange(len(subsubset.index)):
 
 			# read images (variable of interest and associated quality product) 
 			dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
-			qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
 			
 			# make numpy array and flatten
 			band = dataset.GetRasterBand(1)
 			band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
 			band = np.ravel(band)
 
-			qband = qdataset.GetRasterBand(1)
-			qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
-			qband = np.ravel(qband)
+			if quality_variable is not None:
+				qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+			
+				qband = qdataset.GetRasterBand(1)
+				qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				qband = np.ravel(qband)
 
-			#qualityaux = np.in1d(qband,badqualityvalues)
-			qualityaux = qband > 21 
-			pimage_time_seriesq[j, :] = qualityaux
+				qualityaux = np.in1d(qband,badqualityvalues)
+				#qualityaux = qband > 21 
+				pimage_time_seriesq[j, :] = qualityaux
 
-			band[qualityaux]=fillvalue
+				band[qualityaux]=fillvalue
+			
 			masked = band == fillvalue
 
 
@@ -695,30 +790,35 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 		# initialize
 		pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
-		pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
+
+		if quality_variable is not None:
+			pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
 
 		for j in xrange(len(subsubset.index)):
 			
 			# read images (variable of interest and associated quality product) 
 			dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
-			qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+			
 			
 			# make numpy array and flatten
 			band = dataset.GetRasterBand(1)
 			band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
 			band = np.ravel(band)
 
-			qband = qdataset.GetRasterBand(1)
-			qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
-			qband = np.ravel(qband)
+			if quality_variable is not None:
+				qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
 
-			#qualityaux = np.in1d(qband,badqualityvalues)
-			qualityaux = qband > 21 
-			pimage_time_seriesq[j, :] = qualityaux
+				qband = qdataset.GetRasterBand(1)
+				qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				qband = np.ravel(qband)
 
-			band[qualityaux]=fillvalue
+				qualityaux = np.in1d(qband,badqualityvalues)
+				#qualityaux = qband > 21 
+				pimage_time_seriesq[j, :] = qualityaux
+
+				band[qualityaux]=fillvalue
+			
 			masked = band == fillvalue
-
 
 			pimage_time_series[j, :] = np.ma.array(band,mask=masked)
 			
@@ -795,28 +895,34 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 			# initialize
 			pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
-			pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
+
+			if quality_variable is not None:
+				pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
 
 			for j in xrange(len(subsubset.index)):
 			
 				# read images (variable of interest and associated quality product) 
 				dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
-				qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+				
 			
 				# make numpy array and flatten
 				band = dataset.GetRasterBand(1)
 				band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
 				band = np.ravel(band)
 
-				qband = qdataset.GetRasterBand(1)
-				qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
-				qband = np.ravel(qband)
+				if quality_variable is not None:
+					qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+				
+					qband = qdataset.GetRasterBand(1)
+					qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+					qband = np.ravel(qband)
 
-				#qualityaux = np.in1d(qband,badqualityvalues)
-				qualityaux = qband > 21 
-				image_time_seriesq[j, :] = qualityaux
+					qualityaux = np.in1d(qband,badqualityvalues)
+					#qualityaux = qband > 21 
+					pimage_time_seriesq[j, :] = qualityaux
 
-				band[qualityaux]=fillvalue
+					band[qualityaux]=fillvalue
+				
 				masked = band == fillvalue
 
 				pimage_time_series[j, :] = np.ma.array(band,mask=masked)
