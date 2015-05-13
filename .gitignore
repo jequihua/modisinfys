@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+dumbtest.py
+feature_extraction.py
+makevariables.py
+
 # C extensions
 *.so
 
