@@ -595,79 +595,24 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 		# bad data count
 		image_time_seriesq = np.sum(image_time_seriesq,axis=0)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_badpixels.tif"
-		outData = createtif(driver,rows,cols,1,name,data_type=16)
-		writetif(outData,image_time_seriesq,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, image_time_seriesq, rows, cols, path, base_date, varname, "badpixels")
 
 		# means
 		column_means = np.ma.mean(image_time_series,axis=0,dtype=np.float64)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_mean.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_means,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_means, rows, cols, path, base_date, varname, "mean")
 
 		# standard deviations
 		column_standarddeviations = np.ma.std(image_time_series,axis=0,dtype=np.float64)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_std.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_standarddeviations,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_standarddeviations, rows, cols, path, base_date, varname, "std")
 
 		# coefficient of variations
 		column_means = 1/column_means
 		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_cvar.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,coefficients_of_variation,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, coefficients_of_variation, rows, cols, path, base_date, varname, "cvar")
 
 		# medians
 		column_medians = np.ma.median(image_time_series,axis=0)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_median.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_medians,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_medians, rows, cols, path, base_date, varname, "median")
 
 		# dry season
 		subsubset= subset.loc\
@@ -717,64 +662,20 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 				
 		# means
 		column_means = np.ma.mean(pimage_time_series,axis=0,dtype=np.float64)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drymean.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_means,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_means, rows, cols, path, base_date, varname, "drymean")
 
 		# standard deviations
 		column_standarddeviations = np.ma.std(pimage_time_series,axis=0,dtype=np.float64)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drystd.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_standarddeviations,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_standarddeviations, rows, cols, path, base_date, varname, "drystd")
 
 		# coefficient of variations
 		column_means = 1/column_means
 		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drycvar.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,coefficients_of_variation,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, coefficients_of_variation, rows, cols, path, base_date, varname, "drycvar")
 
 		# medians
 		column_medians = np.ma.median(pimage_time_series,axis=0)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_drymedian.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_medians,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_medians, rows, cols, path, base_date, varname, "drymedian")
 
 		# wet season
 		subsubset= subset.loc\
@@ -827,64 +728,20 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 				
 		# means
 		column_means = np.ma.mean(pimage_time_series,axis=0,dtype=np.float64)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetmean.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_means,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_means, rows, cols, path, base_date, varname, "wetmean")
 
 		# standard deviations
 		column_standarddeviations = np.ma.std(pimage_time_series,axis=0,dtype=np.float64)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetstd.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_standarddeviations,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
-
+		save_file(dataset, column_standarddeviations, rows, cols, path, base_date, varname, "wetstd")
+		
 		# coefficient of variations
 		column_means = 1/column_means
 		coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetcvar.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,coefficients_of_variation,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, coefficients_of_variation, rows, cols, path, base_date, varname, "wetcvar")
 
 		# medians
 		column_medians = np.ma.median(pimage_time_series,axis=0)
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_wetmedian.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,column_medians,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, column_medians, rows, cols, path, base_date, varname, "wetmedian")
 
 		# monthly features
 		for m in range(1,13):
@@ -947,85 +804,30 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 
 			# medians
 			column_medians = np.ma.median(pimage_time_series,axis=0)
-
-			# image metadata
-			projection = dataset.GetProjection()
-			transform = dataset.GetGeoTransform()
-			driver = dataset.GetDriver()
-
-			name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_month"+str(m)+"_median.tif"
-			outData = createtif(driver,rows,cols,1,name)
-			writetif(outData,column_medians,projection,transform,order='r')
-
-			# close dataset properly
-			outData = None
-
+			save_file(dataset, column_medians, rows, cols, path, base_date, varname, "median")
+			
 		# Percentiles
 		image_time_series = np.ma.filled(image_time_series,fill_value=np.nan)
 
 		# 20%
 		p20 = np.nanpercentile(image_time_series,20,axis=0)
 		p20[np.isnan(p20)]=0
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc20.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,p20,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, p20, rows, cols, path, base_date, varname, "perc20")
 
 		# 30%
 		p30 = np.nanpercentile(image_time_series,30,axis=0)
 		p30[np.isnan(p30)]=0
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc30.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,p30,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, p90, rows, cols, path, base_date, varname, "perc90")
 
 		# 70%
 		p70 = np.nanpercentile(image_time_series,70,axis=0)
 		p70[np.isnan(p70)]=0
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc70.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,p70,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, p70, rows, cols, path, base_date, varname, "perc70")
 
 		# 90%
 		p90 = np.nanpercentile(image_time_series,90,axis=0)
 		p90[np.isnan(p90)]=0
-
-		# image metadata
-		projection = dataset.GetProjection()
-		transform = dataset.GetGeoTransform()
-		driver = dataset.GetDriver()
-
-		name = path+str(int(base_date))+"/"+str(int(base_date))+"_"+varname+"_perc90.tif"
-		outData = createtif(driver,rows,cols,1,name)
-		writetif(outData,p90,projection,transform,order='r')
-
-		# close dataset properly
-		outData = None
+		save_file(dataset, p90, rows, cols, path, base_date, varname, "perc90")
 
 	# close dataset 
 	dataset = None
@@ -1066,5 +868,18 @@ def calculate_spectral_correlation(x,y,order=1):
     
     return(spectral_correlation)
 
+def save_file(dataset, data, rows, cols, path, base_date, varname, sufix):
+	"""
+	This method saves data to a tif file using the provided sufix.
+	"""
+	# image metadata
+	projection = dataset.GetProjection()
+	transform = dataset.GetGeoTransform()
+	driver = dataset.GetDriver()
 
+	name = path + str(int(base_date)) + "/" + str(int(base_date)) + "_" + varname + "_" + sufix + ".tif"
+	outData = createtif(driver, rows, cols, 1, name)
+	writetif(outData, data, projection, transform, order='r')
 
+	# close dataset properly
+	outData = None	
