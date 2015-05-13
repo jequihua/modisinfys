@@ -2,6 +2,7 @@
 #  Name: concentrates GeoTIFF input and output capabilities
 #  Purpose:  open, close, read and write GeoTIFF rasters 
 #                
+#
 #  Author: Julian Equihua
 
 import sys
