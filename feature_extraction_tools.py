@@ -300,9 +300,11 @@ def qextract(xcoord,ycoord,image,qualityimage=None,fillvalue=-3000,\
 
 	return value
 
-def simpleimagestacktable(shapefile,data_frame1,date_variable1="yeardate",\
-					positions1=None,positions2=None,days=None,years=1,\
-					variable=2,quality_variable=7,fillvalue=None):
+def simpleimagestacktable(shapefile,
+						 data_frame1,
+						 data_frame2,
+						  date_variable1="yeardate",
+						  idvariable="IdConglome"):
 	'''
 	some fucking info
 
@@ -315,41 +317,36 @@ def simpleimagestacktable(shapefile,data_frame1,date_variable1="yeardate",\
 
 	print("merging dataframes")
 	# merge coordinates to training dataframe
-	merged = mergedataframes(shpcoordinates,data_frame1)
+	merged = mergedataframes(shpcoordinates,data_frame1,on=idvariable)
 
-	print("searching dataframes (dates)")
-	data_frames, data_length = searchdates(merged,data_frame2,\
-		date_variable1=date_variable1,date_variable2=date_variable2,\
-		positions1=positions1,positions2=positions2,\
-		days=days)
+	# column names in searched_data_frame
+	colnames = list(merged.columns.values)
 
-	# output table dimensions
-	minimum_length = min(data_length)
-	ndata_frames = len(data_frames)
-	output = np.zeros((ndata_frames,minimum_length+1))
-
-	print("processing dataframes")
-	for i in xrange(ndata_frames):
+	# finde index of date variable
+	idx_year = colnames.index(date_variable1)
 
 
-		data_frame = data_frames[i]
+	# unique layers of covariates
+	layers = pd.unique(data_frame2.iloc[:,1])
+	print(type(layers))
+	print(layers)
 
-		output[i,0] = merged.iloc[i,0]
+	# initialize
+	output = np.zeros()
 
-		for j in xrange(minimum_length):
+	for year in np.unique(data_frame1[[date_variable1]]):
 
+		images = data_frame2[[str(year)]]
+	 	subset = merged.loc[(merged.iloc[:,idx_year]]
 
-			imagepath=data_frame.iloc[j,variable]
-			qualityimagepath=data_frame.iloc[j,quality_variable]
+	 	for i in xrange(len(subset.index)):
+	 		for j in xrange(len(images))
+	
+	 			imagepath=data_frame2.loc[j,str(year)]
 
-			value = extract(merged.iloc[i,1],merged.iloc[i,2],\
-			image=imagepath,\
-			qualityimage=qualityimagepath,\
-			data_type=16,fillvalue=fillvalue)
-			output[i,j+1]=value 
-
-	return output
-
+	 			value = extract(merged.iloc[i,1],merged.iloc[i,2],\
+	 			image=imagepath,\
+	 			data_type=32)
 
 def compleximagestacktable(shapefile,data_frame1,data_frame2,\
 					date_variable1="yeardate",date_variable2="yeardate",\
