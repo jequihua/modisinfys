@@ -328,25 +328,28 @@ def simpleimagestacktable(shapefile,
 
 	# unique layers of covariates
 	layers = pd.unique(data_frame2.iloc[:,1])
-	print(type(layers))
-	print(layers)
 
 	# initialize
-	output = np.zeros()
+	output = np.zeros((len(merged.index),len(layers)),dtype=np.float64)
 
-	for year in np.unique(data_frame1[[date_variable1]]):
-
+	#for i in xrange(len(merged.index)):
+	for i in xrange(1):	
+		year = int(merged.iloc[i,idx_year])
 		images = data_frame2[[str(year)]]
-	 	subset = merged.loc[(merged.iloc[:,idx_year]]
+		
+		for j in xrange(len(images)):
+			
+			imagepath=data_frame2.loc[j,str(year)]
 
-	 	for i in xrange(len(subset.index)):
-	 		for j in xrange(len(images))
-	
-	 			imagepath=data_frame2.loc[j,str(year)]
+	  		value = extract(merged.iloc[i,1],merged.iloc[i,2],\
+	  		image=imagepath,\
+	  		data_type=32)
 
-	 			value = extract(merged.iloc[i,1],merged.iloc[i,2],\
-	 			image=imagepath,\
-	 			data_type=32)
+	  		output[i,j] = value
+
+	output = pd.DataFrame(output,columns=layers,index=merged.index)
+	output = pd.concat([merged,output],axis=1)
+	return output			
 
 def compleximagestacktable(shapefile,data_frame1,data_frame2,\
 					date_variable1="yeardate",date_variable2="yeardate",\
