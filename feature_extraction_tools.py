@@ -876,7 +876,6 @@ def save_file(dataset, data, rows, cols, path, base_date, varname, sufix):
 	projection = dataset.GetProjection()
 	transform = dataset.GetGeoTransform()
 	driver = dataset.GetDriver()
-
 	name = path + str(int(base_date)) + "/" + str(int(base_date)) + "_" + varname + "_" + sufix + ".tif"
 	outData = createtif(driver, rows, cols, 1, name)
 	writetif(outData, data, projection, transform, order='r')
