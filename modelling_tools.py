@@ -1,20 +1,46 @@
-
 import pandas as pd
 import pylab as pl
 import matplotlib.pyplot as plt
 import numpy as np
 
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import ExtraTreesRegressor
 from sklearn import cross_validation
 from sklearn import datasets
 from sklearn.metrics import r2_score
 
-from sklearn.externals import joblib
+from numba import jit
+from numpy import arange
 
-# import training data as data frame
-#data = pd.read_csv("D:/Julian/64_ie_maps/julian_tables_2/training_final_good.csv")
-data = pd.read_csv("D:/Julian/64_ie_maps/cleaning_training/train_ff3.csv")
+from geotiffio import readtif
+from geotiffio import createtif
+from geotiffio import writetif
+
+from scipy import linalg
+from scipy import stats
+from scipy.stats.distributions import norm
+from scipy.ndimage.filters import uniform_filter
+from scipy.ndimage.filters import median_filter
+
+from sklearn.cluster import KMeans
+
+def changeencode(data,cols):
+    for col in cols:
+        data[col] = data[col].str.decode('iso-8859-1').str.encode('utf-8')
+    return data
+
+def replace_missings(data,valuetoreplace,replacement=np.nan):
+	'''
+	replace certain value with some other value
+	'''
+	data = data.replace(valuetoreplace,replacement)
+	return data
+
+def preparemodel(data=,
+				n_estimators=1000,
+				njobs=4,max_features=85,
+				min):
+	
+	#data = pd.read_csv("D:/Julian/64_ie_maps/cleaning_training/train_ff3.csv")
 
 # replace -999 flags
 data = data.replace("NA",np.nan)
@@ -116,31 +142,3 @@ varimpdf['variable']=names
 varimpdf['importance']=imp
 varimpdf = varimpdf.sort(columns="importance",ascending=False)
 varimpdf.to_csv(path+"0varimp_ff3_rf_1000_85_5.csv", sep=',', encoding='utf-8',index=False)
-
-#print(type(imp))
-#imp_selection = imp[0:21]
-#names_selection = names[0:21]
-
-#print(type(imp_selection))
-
-#plt.barh(range(21),imp_selection,align="center")
-#plt.yticks(range(21),names_selection)
-
-#plt.xlabel("Importance of features")
-#plt.ylabel("Features")
-#plt.title("Importance of eache feature")
-#plt.show()
-
-# print("Feature ranking:")
-
-# for f in range(10):
-#     print("%d. feature %d (%f)" % (f + 1, indices[f], importances[indices[f]]))
-
-# # Plot the feature importances of the forest
-# plt.figure()
-# plt.title("Feature importances")
-# plt.bar(range(10), importances[indices],
-#        color="r", yerr=std[indices], align="center")
-# plt.xticks(range(10), indices)
-# plt.xlim([-1, 10])
-# plt.show()

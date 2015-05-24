@@ -16,7 +16,6 @@ import os
 
 import struct as st
 
-
 def tojulian(date_string,format):
 
 	'''
@@ -876,7 +875,10 @@ def save_file(dataset, data, rows, cols, path, base_date, varname, sufix):
 	projection = dataset.GetProjection()
 	transform = dataset.GetGeoTransform()
 	driver = dataset.GetDriver()
-	name = path + str(int(base_date)) + "/" + str(int(base_date)) + "_" + varname + "_" + sufix + ".tif"
+	outpath = path + str(int(base_date)) + "/"
+	if not os.path.exists(outpath):
+			os.makedirs(outpath)
+	name = outpath + str(int(base_date)) + "_" + varname + ".tif"
 	outData = createtif(driver, rows, cols, 1, name)
 	writetif(outData, data, projection, transform, order='r')
 
