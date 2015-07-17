@@ -816,7 +816,7 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		# 30%
 		p30 = np.nanpercentile(image_time_series,30,axis=0)
 		p30[np.isnan(p30)]=0
-		save_file(dataset, p90, rows, cols, path, base_date, varname, "perc90")
+		save_file(dataset, p90, rows, cols, path, base_date, varname, "perc30")
 
 		# 70%
 		p70 = np.nanpercentile(image_time_series,70,axis=0)
@@ -827,6 +827,286 @@ def sliding_features(imagesdf,years=np.array([2004,2005,2006,2007,2008,2009,\
 		p90 = np.nanpercentile(image_time_series,90,axis=0)
 		p90[np.isnan(p90)]=0
 		save_file(dataset, p90, rows, cols, path, base_date, varname, "perc90")
+
+	# close dataset 
+	dataset = None
+
+	return True
+
+def sliding_features_months(imagesdf,\
+							years=np.array([2004,2005,2006,2007,2008,2009,2010,2011,2012,2013]),\
+							months=np.array([1,2,3,4,5,6,7,8,9,10,11,12]),\
+							yeardate_variable="yeardate",\
+						monthdate_variable="monthdate",\
+						variable=5,\
+						quality_variable=7,\
+						badqualityvalues=[-1,2,3,255],\
+						window=1,fillvalue=0,path=None):
+
+# years years=np.array([2004,2005,2006,2007,2008,2009,\
+#						2010,2011,2012,2013])
+
+	# column names in searched_data_frame
+	colnames = list(imagesdf.columns.values)
+
+	# variable name
+	varname=colnames[variable]
+	print(varname)
+	
+	# finde index of date variable
+	idx_year = colnames.index(yeardate_variable)
+	idx_month = colnames.index(monthdate_variable)
+
+	for i in xrange(np.shape(years)[0]):
+		print(i)
+		for j in xrange(np.shape(months)[0]):
+			j=j+1
+			print(j)
+
+			base_date = float(years[i])
+			month_base_date = float(months[j])
+
+			if j==0:
+				subset = imagesdf.loc\
+				[\
+			  	(imagesdf.iloc[:,idx_year] == (base_date - window))\
+				| (imagesdf.iloc[:,idx_year] == (base_date))\
+				| (imagesdf.iloc[:,idx_year] == (base_date + window))\
+				]
+			else:
+
+				subset = imagesdf.loc\
+				[\
+			  	 (imagesdf.iloc[:,idx_year] == (base_date - window))\
+				| (imagesdf.iloc[:,idx_year] == (base_date))\
+				| (imagesdf.iloc[:,idx_year] == (base_date + window))\
+				| (imagesdf.iloc[:,idx_year] == (base_date + window+1))\
+				]
+
+				# drop bad rows
+				subset = subset.drop(subset[(subset.yeardate==(base_date-window)) & (subset.monthdate<month_base_date)].index)
+				subset = subset.drop(subset[(subset.yeardate==(base_date+window+1)) & (subset.monthdate>=month_base_date)].index)
+				subset.to_csv("D:/Julian/64_ie_maps/rasters/covariates_month/nreflectance1000/2004/test.csv", sep=',', encoding='utf-8')
+
+			# initialize
+			dataset,rows,cols,bands = readtif(subset.iloc[0,5])
+			image_time_series = np.ma.zeros((len(subset.index), cols * rows),dtype=np.float64)
+			if quality_variable is not None:
+				image_time_seriesq = np.zeros((len(subset.index), cols * rows),dtype=bool)
+
+			for j in xrange(len(subset.index)):
+				
+				# read images (variable of interest and associated quality product) 
+				dataset,rows,cols,bands = readtif(subset.iloc[j,variable])
+				
+				# make numpy array and flatten
+				band = dataset.GetRasterBand(1)
+				band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				band = np.ravel(band)
+
+				if quality_variable is not None:
+					qdataset,qrows,qcols,qbands = readtif(subset.iloc[j,quality_variable])	
+					qband = qdataset.GetRasterBand(1)
+					qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+					qband = np.ravel(qband)
+
+					# check which pixels have bad quality
+					qualityaux = np.in1d(qband,badqualityvalues)
+					#qualityaux = qband > 21 
+					image_time_seriesq[j, :] = qualityaux
+
+					band[qualityaux]=fillvalue
+				
+				masked = band == fillvalue
+
+				image_time_series[j, :] = np.ma.array(band,mask=masked)
+				
+				# close qdataset
+				qdataset = None
+
+			print("first variables")
+
+			# bad data count
+			# image_time_seriesq = np.sum(image_time_seriesq,axis=0)
+			# save_file(dataset, image_time_seriesq, rows, cols, path, base_date,month_base_date, varname, "badpixels")
+
+			# means
+			column_means = np.ma.mean(image_time_series,axis=0,dtype=np.float64)
+			save_file(dataset, column_means, rows, cols, path, base_date,month_base_date, varname, "mean")
+
+			# standard deviations
+			column_standarddeviations = np.ma.std(image_time_series,axis=0,dtype=np.float64)
+			save_file(dataset, column_standarddeviations, rows, cols, path, base_date,month_base_date, varname, "std")
+
+			# coefficient of variations
+			column_means = 1/column_means
+			coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+			save_file(dataset, coefficients_of_variation, rows, cols, path, base_date,month_base_date, varname, "cvar")
+
+			# medians
+			column_medians = np.ma.median(image_time_series,axis=0)
+			save_file(dataset, column_medians, rows, cols, path, base_date,month_base_date, varname, "median")
+
+
+			print("seasonal variables")
+			# dry season
+			subsubset= subset.loc\
+			[\
+			  (imagesdf.iloc[:,idx_month] == 1)\
+			| (imagesdf.iloc[:,idx_month] == 2)\
+			| (imagesdf.iloc[:,idx_month] == 3)\
+			| (imagesdf.iloc[:,idx_month] == 4)\
+			| (imagesdf.iloc[:,idx_month] == 12)\
+			]
+
+			# initialize
+			pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
+			if quality_variable is not None:
+				pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
+
+			for j in xrange(len(subsubset.index)):
+
+				# read images (variable of interest and associated quality product) 
+				dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
+				
+				# make numpy array and flatten
+				band = dataset.GetRasterBand(1)
+				band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				band = np.ravel(band)
+
+				if quality_variable is not None:
+					qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+				
+					qband = qdataset.GetRasterBand(1)
+					qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+					qband = np.ravel(qband)
+
+					qualityaux = np.in1d(qband,badqualityvalues)
+					#qualityaux = qband > 21 
+					pimage_time_seriesq[j, :] = qualityaux
+
+					band[qualityaux]=fillvalue
+				
+				masked = band == fillvalue
+
+
+				pimage_time_series[j, :] = np.ma.array(band,mask=masked)
+				
+				# close qdataset
+				qdataset = None
+					
+			# means
+			column_means = np.ma.mean(pimage_time_series,axis=0,dtype=np.float64)
+			save_file(dataset, column_means, rows, cols, path, base_date,month_base_date, varname, "drymean")
+
+			# standard deviations
+			column_standarddeviations = np.ma.std(pimage_time_series,axis=0,dtype=np.float64)
+			save_file(dataset, column_standarddeviations, rows, cols, path, base_date,month_base_date, varname, "drystd")
+
+			# coefficient of variations
+			column_means = 1/column_means
+			coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+			save_file(dataset, coefficients_of_variation, rows, cols, path, base_date,month_base_date, varname, "drycvar")
+
+			# medians
+			column_medians = np.ma.median(pimage_time_series,axis=0)
+			save_file(dataset, column_medians, rows, cols, path, base_date,month_base_date, varname, "drymedian")
+
+			# wet season
+			subsubset= subset.loc\
+			[\
+			  (imagesdf.iloc[:,idx_month] == 5)\
+			| (imagesdf.iloc[:,idx_month] == 6)\
+			| (imagesdf.iloc[:,idx_month] == 7)\
+			| (imagesdf.iloc[:,idx_month] == 8)\
+			| (imagesdf.iloc[:,idx_month] == 9)\
+			| (imagesdf.iloc[:,idx_month] == 10)\
+			| (imagesdf.iloc[:,idx_month] == 11)\
+			]
+
+			# initialize
+			pimage_time_series = np.ma.zeros((len(subsubset.index), cols * rows),dtype=np.float64)
+
+			if quality_variable is not None:
+				pimage_time_seriesq = np.zeros((len(subsubset.index), cols * rows),dtype=bool)
+
+			for j in xrange(len(subsubset.index)):
+				
+				# read images (variable of interest and associated quality product) 
+				dataset,rows,cols,bands = readtif(subsubset.iloc[j,variable])
+				
+				
+				# make numpy array and flatten
+				band = dataset.GetRasterBand(1)
+				band = band.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+				band = np.ravel(band)
+
+				if quality_variable is not None:
+					qdataset,qrows,qcols,qbands = readtif(subsubset.iloc[j,quality_variable])
+
+					qband = qdataset.GetRasterBand(1)
+					qband = qband.ReadAsArray(0, 0, cols, rows).astype(np.int16)
+					qband = np.ravel(qband)
+
+					qualityaux = np.in1d(qband,badqualityvalues)
+					#qualityaux = qband > 21 
+					pimage_time_seriesq[j, :] = qualityaux
+
+					band[qualityaux]=fillvalue
+				
+				masked = band == fillvalue
+
+				pimage_time_series[j, :] = np.ma.array(band,mask=masked)
+				
+				# close qdataset
+				qdataset = None
+					
+			# means
+			column_means = np.ma.mean(pimage_time_series,axis=0,dtype=np.float64)
+			save_file(dataset, column_means, rows, cols, path, base_date,month_base_date, varname, "wetmean")
+
+			# standard deviations
+			column_standarddeviations = np.ma.std(pimage_time_series,axis=0,dtype=np.float64)
+			save_file(dataset, column_standarddeviations, rows, cols, path, base_date,month_base_date, varname, "wetstd")
+			
+			# coefficient of variations
+			column_means = 1/column_means
+			coefficients_of_variation = np.multiply(column_standarddeviations,column_means)
+			save_file(dataset, coefficients_of_variation, rows, cols, path, base_date,month_base_date, varname, "wetcvar")
+
+			# medians
+			column_medians = np.ma.median(pimage_time_series,axis=0)
+			save_file(dataset, column_medians, rows, cols, path, base_date,month_base_date, varname, "wetmedian")
+
+			print("percentiles")
+				
+			# Percentiles
+			image_time_series = np.ma.filled(image_time_series,fill_value=np.nan)
+
+			# 20%
+			p20 = np.nanpercentile(image_time_series,20,axis=0)
+			p20[np.isnan(p20)]=0
+			save_file(dataset, p20, rows, cols, path, base_date,month_base_date, varname, "perc20")
+
+			# 35%
+			p35 = np.nanpercentile(image_time_series,35,axis=0)
+			p35[np.isnan(p35)]=0
+			save_file(dataset, p35, rows, cols, path, base_date,month_base_date, varname, "perc35")
+
+			# 65%
+			p65 = np.nanpercentile(image_time_series,65,axis=0)
+			p65[np.isnan(p65)]=0
+			save_file(dataset, p65, rows, cols, path, base_date,month_base_date, varname, "perc65")
+
+			# 80%
+			p80 = np.nanpercentile(image_time_series,80,axis=0)
+			p80[np.isnan(p80)]=0
+			save_file(dataset, p80, rows, cols, path, base_date,month_base_date, varname, "perc80")
+
+			# 95%
+			p95 = np.nanpercentile(image_time_series,95,axis=0)
+			p95[np.isnan(p95)]=0
+			save_file(dataset, p95, rows, cols, path, base_date,month_base_date, varname, "perc95")
 
 	# close dataset 
 	dataset = None
@@ -867,19 +1147,31 @@ def calculate_spectral_correlation(x,y,order=1):
     
     return(spectral_correlation)
 
-def save_file(dataset, data, rows, cols, path, base_date, varname, sufix):
+def save_file(dataset, data, rows, cols, path, base_date,month_base_date, varname, sufix):
 	"""
 	This method saves data to a tif file using the provided sufix.
+
 	"""
+
+	# # filter raster
+	datasetf,rows,cols,bands = readtif("D:/Julian/64_ie_maps/rasters/filter/bov_cbz_km2.tif")
+	bandf = datasetf.GetRasterBand(1)
+	bandf = bandf.ReadAsArray(0, 0, cols, rows).astype(np.float64)
+	bandf = np.ravel(bandf)
+
+	# mexico body mask
+	baddatamask = (bandf < 0) | (data == 0) 
+
 	# image metadata
 	projection = dataset.GetProjection()
 	transform = dataset.GetGeoTransform()
 	driver = dataset.GetDriver()
-	outpath = path + str(int(base_date)) + "/"
+	outpath = path + str(int(base_date)) + "/" + str(int(month_base_date)) +"/"
 	if not os.path.exists(outpath):
 			os.makedirs(outpath)
-	name = outpath + str(int(base_date)) + "_" + varname + ".tif"
+	name = outpath + str(int(base_date)) +"_"+str(int(month_base_date))+ "_" + varname+"_"+sufix + ".tif"
 	outData = createtif(driver, rows, cols, 1, name)
+	data[baddatamask] = np.nan
 	writetif(outData, data, projection, transform, order='r')
 
 	# close dataset properly

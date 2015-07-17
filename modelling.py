@@ -14,23 +14,27 @@ from sklearn.externals import joblib
 
 # import training data as data frame
 #data = pd.read_csv("D:/Julian/64_ie_maps/julian_tables_2/training_final_good.csv")
-data = pd.read_csv("D:/Julian/64_ie_maps/cleaning_training/train_ff3.csv")
+data = pd.read_csv("D:/Julian/64_ie_maps/modelling_20150702/training_tables_finales/final_train_20150716.csv")
 
 # replace -999 flags
 data = data.replace("NA",np.nan)
 
 
+print(type(data))
+
 colnames = data.columns
-year_variable=284
-target_variable=270
-print("check year variable")
-print(colnames[year_variable])
+
+target_variable=13
+
 print("check target variable")
 print(colnames[target_variable])
 
+year_variable=1
+
 data = data.loc\
 		[\
-		  (data.iloc[:,year_variable] == 2004)\
+		  (data.iloc[:,year_variable] == 0)\
+		| (data.iloc[:,year_variable] == 2004)\
 		| (data.iloc[:,year_variable] == 2005)\
 		| (data.iloc[:,year_variable] == 2006)\
 		| (data.iloc[:,year_variable] == 2007)\
@@ -38,7 +42,7 @@ data = data.loc\
 		| (data.iloc[:,year_variable] == 2010)\
 		| (data.iloc[:,year_variable] == 2011)\
 		| (data.iloc[:,year_variable] == 2012)\
-		| (data.iloc[:,year_variable] == 2013)\
+		| (data.iloc[:,year_variable] == 2013)
 		]
 
 #print(np.shape(data))
@@ -47,12 +51,11 @@ data = data.loc\
 #print(data.head())
 
 # initialize model
-rf = RandomForestRegressor(n_estimators=1000,n_jobs=4,max_features=85,min_samples_split=5,oob_score=True)
+rf = RandomForestRegressor(n_estimators=1000,n_jobs=4,max_features=64,min_samples_split=5,oob_score=True)
 #rf = ExtraTreesRegressor(n_estimators=1000,n_jobs=4,max_features=30,min_samples_split=5,bootstrap=True,oob_score=True)
 
 # indices of variables of interest (target and covariates)
-selection = np.append([target_variable],range(4,258))
-selection = np.append(selection,[year_variable])
+selection = np.append([target_variable],range(25,216))
 
 # select data of interest
 data_selection = data.iloc[:,selection].as_matrix()
@@ -64,14 +67,15 @@ data_selection = data.iloc[:,selection].as_matrix()
 data_selection = data_selection.astype(np.float32, copy=False)
 
 # complete cases
-data_selection = data_selection[~np.isnan(data_selection).any(axis=1)]
-data_selection = data_selection[np.isfinite(data_selection).any(axis=1)]
+goodidx = ~np.isnan(data_selection).any(axis=1)
+data_selection = data_selection[goodidx]
+#data_selection = data_selection[np.isfinite(data_selection).any(axis=1)]
 
 #np.savetxt("foo.csv",data_selection, delimiter=",")
 
 # target variable / covariates
 y = data_selection[:,0]
-ylog =np.log(y)
+
 x = data_selection[:,1:]
 
 # split test-train
@@ -79,13 +83,18 @@ x = data_selection[:,1:]
 
 # fit model
 pmodel = rf.fit(x,y)
-path="D:/Julian/64_ie_maps/models/average_tree_height/1000m/random_forest/ff3_rf_1000_85_5/"
+path="D:/Julian/64_ie_maps/modelling_20150702/models/AlturaTotal_media_c1c2_clean/"
 
-joblib.dump(pmodel,path+ 'ff3_rf_1000_85_5.pkl')
+joblib.dump(pmodel,path+ 'treeheight20150716.pkl')
 
 # validation measures
 oobp = pmodel.oob_prediction_
-oobplog = np.exp(oobp)
+oobpout = np.zeros((np.shape(data)[0]),dtype=np.float64)
+oobpout[oobpout==0]=-1
+oobpout[goodidx]=oobp
+np.savetxt(path+"0oobprediction20150716.csv", oobpout, delimiter=",")
+
+#oobplog = np.exp(oobp)
 corrins = np.corrcoef(oobp,y)
 rmse = np.sqrt(np.mean((y - oobp)**2))
 mae = np.mean(np.absolute((y - oobp)))
@@ -97,6 +106,9 @@ print(corrins)
 print(rmse)
 print(mae)
 print(meanofresp)
+
+statistics = np.array([corrins[0,1],rmse,mae,meanofresp])
+np.savetxt(path+"0statistics.csv",statistics, delimiter=",")
 
 # plot
 
@@ -115,7 +127,7 @@ varimpdf = pd.DataFrame(index=index, columns=columns)
 varimpdf['variable']=names
 varimpdf['importance']=imp
 varimpdf = varimpdf.sort(columns="importance",ascending=False)
-varimpdf.to_csv(path+"0varimp_ff3_rf_1000_85_5.csv", sep=',', encoding='utf-8',index=False)
+varimpdf.to_csv(path+"0varimportance20150716.csv", sep=',', encoding='utf-8',index=False)
 
 #print(type(imp))
 #imp_selection = imp[0:21]
