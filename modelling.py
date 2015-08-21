@@ -14,7 +14,7 @@ from sklearn.externals import joblib
 
 # import training data as data frame
 #data = pd.read_csv("D:/Julian/64_ie_maps/julian_tables_2/training_final_good.csv")
-data = pd.read_csv("D:/Julian/64_ie_maps/modelling_20150702/training_tables_finales/final_train_20150716.csv")
+data = pd.read_csv("D:/Julian/64_ie_maps/modelling_20150702/training_tables_20150821/training_final_20150821.csv")
 
 # replace -999 flags
 data = data.replace("NA",np.nan)
@@ -83,16 +83,16 @@ x = data_selection[:,1:]
 
 # fit model
 pmodel = rf.fit(x,y)
-path="D:/Julian/64_ie_maps/modelling_20150702/models/AlturaTotal_media_c1c2_clean/"
+path="D:/Julian/64_ie_maps/modelling_20150702/models/AlturaTotal_media/"
 
-joblib.dump(pmodel,path+ 'treeheight20150716.pkl')
+joblib.dump(pmodel,path+ 'treeheight20150821.pkl')
 
 # validation measures
 oobp = pmodel.oob_prediction_
 oobpout = np.zeros((np.shape(data)[0]),dtype=np.float64)
 oobpout[oobpout==0]=-1
 oobpout[goodidx]=oobp
-np.savetxt(path+"0oobprediction20150716.csv", oobpout, delimiter=",")
+np.savetxt(path+"0oobprediction20150821.csv", oobpout, delimiter=",")
 
 #oobplog = np.exp(oobp)
 corrins = np.corrcoef(oobp,y)
@@ -127,7 +127,7 @@ varimpdf = pd.DataFrame(index=index, columns=columns)
 varimpdf['variable']=names
 varimpdf['importance']=imp
 varimpdf = varimpdf.sort(columns="importance",ascending=False)
-varimpdf.to_csv(path+"0varimportance20150716.csv", sep=',', encoding='utf-8',index=False)
+varimpdf.to_csv(path+"0varimportance20150821.csv", sep=',', encoding='utf-8',index=False)
 
 #print(type(imp))
 #imp_selection = imp[0:21]

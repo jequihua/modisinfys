@@ -881,8 +881,8 @@ def sliding_features(imagesdf,years=np.array([2010]),yeardate_variable="yeardate
 	return True
 
 def sliding_features_months(imagesdf,\
-							years=np.array([2013]),\
-							months=np.array([2,3,4,5,6,7,8,9,10,11,12]),\
+							years=np.array([2010]),\
+							months=np.array([1]),\
 							yeardate_variable="yeardate",\
 						monthdate_variable="monthdate",\
 						variable=5,\
@@ -1159,7 +1159,7 @@ def sliding_features_months(imagesdf,\
 	return True
 
 def sliding_features_months_gpp(imagesdf,\
-							years=np.array([2004]),\
+							years=np.array([2010]),\
 							months=np.array([1]),\
 							yeardate_variable="yeardate",\
 						monthdate_variable="monthdate",\
